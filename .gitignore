@@ -171,6 +171,9 @@ _minted*
 # scrwfile
 *.wrt
 
+# shorttoc
+*.stoc
+
 # sympy
 *.sout
 *.sympy
