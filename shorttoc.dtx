@@ -22,14 +22,21 @@
 %<package>\NeedsTeXFormat{LaTeX2e}[2003/12/01]
 %<package>\ProvidesPackage{shorttoc}
 %<*package>
-    [2019/03/08 v1.0 Generates a short overview table of contents]
+    [2019/03/09 v1.0 Generates a short overview table of contents]
 %</package>
 %
 %<*driver>
 \documentclass{ltxdoc}
+\usepackage[T1]{fontenc}
+\usepackage[simple]{shorttoc}
 \EnableCrossrefs
 \CodelineIndex
 \RecordChanges
+\StocType{section}
+\newcommand{\hooklink}[3]{%
+  \noindent%
+  The hook \texttt{\string#1} is exposed via \texttt{\string#2}#3.%
+}
 \begin{document}
   \DocInput{shorttoc.dtx}
   \PrintChanges
@@ -56,7 +63,7 @@
 %   Grave accent  \`     Left brace    \{     Vertical bar  \|
 %   Right brace   \}     Tilde         \~}
 %
-% \changes{v1.0}{2019/03/08}{Initial version}
+% \changes{v1.0}{2019/03/09}{Initial version}
 %
 % \GetFileInfo{shorttoc.dtx}
 %
@@ -68,8 +75,11 @@
 %
 % \maketitle
 %
+% \printshortcontents
+%
 % \section{Introduction}
 % \label{sec:introduction}
+% \addtoshortcontents{Introduction}{Motivate the \textsf{shorttoc} package and summarise this documentation.}
 %
 % Complex documents, such as PhD and Masters theses, can require
 % exhaustive tables of contents. These do not provide the reader with a
@@ -106,5 +116,558 @@
 %
 % \section{Implementation}
 % \label{sec:implementation}
+% \addtoshortcontents{Implementation}{The source for
+% \textsf{shorttoc}, including document commands, styling commands,
+% and the internal mechanics.}
+%
+% It is worth introducing early a few important things. First, we use
+% the \textsf{calc} package to make some of the number-crunching
+% slightly less painful.
+%    \begin{macrocode}
+\RequirePackage{calc}
+%    \end{macrocode}
+%
+% Second, we provide a few commands that are normally defined by the
+% \textsf{Hyperref} package. This means our package should be included
+% \emph{after} the \textsf{Hyperref} package.
+%    \begin{macrocode}
+\providecommand{\@currentHref}{}
+\providecommand{\hyperlink}[2]{#2}
+%    \end{macrocode}
+% This ensures that, if \textsf{Hyperref} \emph{is} included, we will
+% correctly set up hyperlinks; if it is \emph{not} included, then
+% nothing seems out of place.
+%
+% \subsection{Package options}
+% \label{sec:package-options}
+%
+% The \textsf{shorttoc} package has one package option: which of the
+% default layout options to use. The default layout is |simple|, while
+% there is also a fancier |centered| option.
+%
+%    \begin{macrocode}
+\newif\ifstoc@simpletheme\stoc@simplethemefalse
+\newif\ifstoc@centeredtheme\stoc@centeredthemefalse
+
+\DeclareOption{simple}{%
+  \stoc@simplethemetrue%
+  \stoc@centeredthemefalse%
+}
+
+\DeclareOption{centered}{%
+  \stoc@centeredthemetrue%
+  \stoc@simplethemefalse%
+}
+
+\ExecuteOptions{simple}
+
+\ProcessOptions\relax
+
+\ifstoc@simpletheme\ifstoc@centeredtheme
+\PackageError{shorttoc}{More than one layout active}{%
+  More than one layout has been set as active. Either the 'simple'
+  option or 'centered' option for the package should be set, but never
+  both together. If you will be setting styling options yourself, do
+  not pass any options to this package.
+}
+\fi\fi
+%    \end{macrocode}
+%
+%
+% \subsection{Document commands}
+% \label{sec:doc-commands}
+%
+% The \textsf{shorttoc} package exposes a few simple commands to the
+% document author.
+%
+% \begin{macro}{\printshortcontents}
+% The |\printshortcontents| command is used to type out the short
+% contents pages. By including this before the |\tableofcontents|, the
+% short table of contents is inserted first. It takes no arguments.
+%
+%    \begin{macrocode}
+\newcommand{\printshortcontents}[0]{%
+  \stoc@titlecmd*{\stoc@heading}%
+  \stoc@pageformat{}%
+  \stoc@pretable{}%
+  \IfFileExists{\jobname.stoc}{%
+    \input{\jobname.stoc}%
+  }{}%
+  \stoc@posttable{}%
+}
+%    \end{macrocode}
+%
+% The \textsf{shorttoc} provides many internal hooks that can be
+% customised. That makes the internal definition seem overly
+% complicated, but those which might normally be changed are exposed
+% via customisation commands in
+% Section~\ref{sec:customisation-commands}.
+%
+% \end{macro}
+%
+% \begin{macro}{\addtoshortcontents}
+% The second command document authors will need to know about is
+% |\addtoshortcontents|\marg{Chapter name}\marg{Description}. This
+% marks a new entry into the short table of contents. The reason we
+% repeat the chapter name, rather than reading it automatically, is so
+% authors can provide short and/or styled names in the short contents.
+%
+%    \begin{macrocode}
+\newcommand{\addtoshortcontents}{%
+  \@ifstar\stoc@addtoshortcontents@star\stoc@addtoshortcontents@nostar%
+}
+%    \end{macrocode}
+%
+% This command comes in two versions: an un-starred variant, and a
+% starred variant. The un-starred variant includes the chapter number,
+% while the starred variant does not include the chapter number.
+%
+%    \begin{macrocode}
+\def\stoc@headingnumber{}  %% Will be redefined later
+\newcommand{\stoc@addtoshortcontents@nostar}[2]{%
+  \protected@write\@auxout{}{%
+    \string\stoc@write{%
+      \string\makeatletter%
+      \string\stoc@entry{\stoc@headingnumber}{#1}{\thepage}{#2}{\@currentHref}%
+      \string\makeatother\relax%
+    }%
+  }%
+}
+
+\newcommand{\stoc@addtoshortcontents@star}[2]{%
+  \protected@write\@auxout{}{%
+    \string\stoc@write{%
+      %%% Note we do *not* export the chapter number
+      \string\makeatletter%
+      \string\stoc@entry{}{#1}{\thepage}{#2}{\@currentHref}%
+      \string\makeatother\relax%
+    }%
+  }%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \subsection{Customisation commands}
+% \label{sec:customisation-commands}
+%
+% \begin{macro}{\StocDescriptionFormat}
+%    \begin{macrocode}
+\newcommand{\StocDescriptionFormat}[1]{
+  \def\stoc@descriptionformat{#1}%
+}
+%    \end{macrocode}
+% \end{macro}%
+%
+% \begin{macro}{\StocDescriptionSep}
+%    \begin{macrocode}
+\newcommand{\StocDescriptionSep}[1]{
+  \def\stoc@descriptionsep{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocDescriptionWidth}
+%    \begin{macrocode}
+\newcommand{\StocDescriptionWidth}[1]{
+  \def\stoc@descriptionwidth{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocEntrySep}
+%    \begin{macrocode}
+\newcommand{\StocEntrySep}[1]{
+  \def\stoc@entrysep{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocEntryWidth}
+%    \begin{macrocode}
+\newcommand{\StocEntryWidth}[1]{
+  \def\stoc@entrywidth{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocNumberFormat}
+%    \begin{macrocode}
+\newcommand{\StocNumberFormat}[1]{
+  \def\stoc@numberformat{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocNumberSep}
+%    \begin{macrocode}
+\newcommand{\StocNumberSep}[1]{
+  \def\stoc@numbersep{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocPreTable}
+%    \begin{macrocode}
+\newcommand{\StocPreTable}[1]{
+  \def\stoc@pretable{#1}
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocPostTable}
+%    \begin{macrocode}
+\newcommand{\StocPostTable}[1]{
+  \def\stoc@posttable{#1}
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocTitleFormat}
+%    \begin{macrocode}
+\newcommand{\StocTitleFormat}[1]{
+  \def\stoc@titleformat{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocTitleBlockFormat}
+%    \begin{macrocode}
+\newcommand{\StocTitleBlockFormat}[1]{
+  \def\stoc@titleblockformat{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocHeading}
+%    \begin{macrocode}
+\newcommand{\StocHeading}[1]{
+  \def\stoc@heading{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocTitleSep}
+%    \begin{macrocode}
+\newcommand{\StocTitleSep}[1]{
+  \def\stoc@titlesep{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocTitleWidth}
+%    \begin{macrocode}
+\newcommand{\StocTitleWidth}[1]{
+  \def\stoc@titlewidth{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocPageFormat}
+%    \begin{macrocode}
+\newcommand{\StocPageFormat}[1]{
+  \def\stoc@pageformat{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocPageLabel}
+%    \begin{macrocode}
+\newcommand{\StocPageLabel}[1]{
+  \def\stoc@pagelabel{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocPageSep}
+%    \begin{macrocode}
+\newcommand{\StocPageSep}[1]{
+  \def\stoc@pagesep{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocType}
+%    \begin{macrocode}
+\newcommand{\StocType}[1]{
+  \def\stoc@titlecmd{\csname #1\endcsname}%
+  \def\stoc@headingnumber{\csname the#1\endcsname}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+%
+% \subsection{Internal hooks}
+% \label{sec:internal-hooks}
+% To ensure \textsf{shorttoc} can work in as many documents as
+% possible, a wide variety of internal hooks are provided. Many of
+% these are given sensible defaults so it will `just work'. Of course,
+% this being \LaTeX, customisation is not just desirable but
+% necessary: package interactions are complex, so the more ways you
+% can customise things, the less chance there is of catastrophic
+% incompatibility.
+%
+% \begin{macro}{\stoc@defined}
+% The |\stoc@defined| macro is for other package authors to quickly
+% determine if the \textsf{shorttoc} package has been loaded. It is
+% always set to |true|. This is so authors can write something like
+% \begin{verbatim}
+% \@ifundefined{\stoc@defined}{
+%   % Something when shorttoc is not loaded
+% }{
+%   % Something when shorttoc is loaded
+% }
+% \end{verbatim}
+%    \begin{macrocode}
+\def\stoc@defined{true}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\stoc@description}
+% To put the short contents description on the page with more
+% precision, we exploit the \texttt{minipage} environment. The
+% |\stoc@description| command is used internally to lay out this
+% minipage.
+%
+%    \begin{macrocode}
+\newcommand{\stoc@description}[1]{
+  \begin{minipage}[t]{\stoc@descriptionwidth}%
+    {\stoc@descriptionformat #1}\\[\fill]%
+  \end{minipage}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\stoc@descriptionformat}
+% To set the style for the contents descriptions, we expose the
+% |\stoc@descriptionformat| hook. This hook is inserted in the
+% description group, so should set formatting for a group. That is,
+% use commands like |\bfseries| rather than |\textbf|.
+%
+%    \begin{macrocode}
+\def\stoc@descriptionformat{}
+%    \end{macrocode}
+% \end{macro}
+%
+% \hooklink{\stoc@descriptionformat}{\StocDescriptionFormat}{\marg{format}}
+%
+% By default, there is no styling.
+%
+% \begin{macro}{\stoc@descriptionsep}
+% To separate the descriptions from the chapter titles, numbers, and
+% pages, we expose the hook |\stoc@descriptionsep|. This is inserted
+% between the two minipages that define each part of the short table
+% of contents.
+%
+%    \begin{macrocode}
+\def\stoc@descriptionsep{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@descriptionsep}{\StocDescriptionSep}{\marg{format}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@descriptionwidth}
+% The |\stoc@descriptionwidth| hook defines the width of the
+% description. Usually you want to set this to some proportion of
+% |\textwidth|, but more complex calculations are allowed.
+%
+%    \begin{macrocode}
+\def\stoc@descriptionwidth{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@descriptionwidth}{\StocDescriptionWidth}{\marg{length}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@entry}
+% The
+% |\stoc@entry|\marg{number}\marg{title}\marg{page}\marg{description}\marg{hypertarget}
+% macro is one of the most complicated macro we define. It is written
+% to the |jobname.stoc| file to be included back into the document in
+% later runs.
+%
+% It should hardly ever need to be redefined as we include a large
+% number of hooks for styling.
+%
+%    \begin{macrocode}
+\newcommand{\stoc@entry}[5]{%
+  \begin{minipage}{\stoc@entrywidth}
+    \stoc@title@page{#1}{#2}{#3}{#5}%
+    \stoc@descriptionsep{}%
+    \stoc@description{#4}%
+  \end{minipage}%
+  \stoc@entrysep{}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\stoc@entrysep}
+% To separate the entries in the short contents, we expose the hook
+% |\stoc@entrysep|. This allows you to finely control how the
+% different entries are laid out.
+%
+%    \begin{macrocode}
+\def\stoc@entrysep{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@entrysep}{\StocEntrySep}{\marg{format}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@entrywidth}
+% The |\stoc@entrywidth| hook defines the overall width of the short
+% contents entry. Usually this will be |\textwidth|, but if you need
+% more complex layouts this can be customised.
+%
+%    \begin{macrocode}
+\def\stoc@entrywidth{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@entrywidth}{\StocEntryWidth}{\marg{length}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@pretable}
+%    \begin{macrocode}
+\def\stoc@pretable{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@pretable}{\StocPreTable}{\marg{format}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@posttable}
+%    \begin{macrocode}
+\def\stoc@postable{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@posttable}{\StocPostTable}{\marg{format}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@pageformat}
+%    \begin{macrocode}
+\def\stoc@pageformat{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@pageformat}{\StocPageFormat}{\marg{format}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@pagelabel}
+%    \begin{macrocode}
+\def\stoc@pagelabel{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@pagelabel}{\StocPageLabel}{\marg{label}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@title@page}
+%    \begin{macrocode}
+\newcommand{\stoc@title@page}[4]{%
+  \begin{minipage}[t]{\stoc@titlewidth}
+    \stoc@titleblockformat%
+    {\stoc@numberformat \hyperlink{#4}{#1}}%
+    \stoc@numbersep%
+    {\stoc@titleformat \hyperlink{#4}{#2}}%
+    \stoc@pagesep%
+    {\stoc@pageformat \stoc@pagelabel~#3}%
+    \\[\fill]%
+  \end{minipage}
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\stoc@titleblockformat}
+%    \begin{macrocode}
+\def\stoc@titleblockformat{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@titleblockformat}{\StocTitleBlockFormat}{\marg{format}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@titleformat}
+%    \begin{macrocode}
+\def\stoc@titleformat{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@titleformat}{\StocTitleFormat}{\marg{format}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@titlewidth}
+%    \begin{macrocode}
+\newcommand{\stoc@titlewidth}[4]{%
+  \def\stoc@titlewidth{}
+}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@titlewidth}{\StocTitleWidth}{\marg{length}}
+% \end{macro}
+%
+% \subsection{Built-in themes}
+% \label{sec:built-in-themes}
+%
+% We define two built-in themes for the short table of contents. The
+% |simple| theme is a sensible base to build on top of, should you need
+% any further customisation. The |centered| theme is more complicated,
+% and demonstrates the lengths to which you can go to produce pretty
+% output.
+%
+% \begin{macro}{simple}
+% The |simple| theme defines a chapter page called overview, where
+% every entry is set as a chapter number then name flush left, the
+% page number flush right, and the description set below that slightly
+% indented. All the entries are separated by a small vertical space.
+%    \begin{macrocode}
+\ifstoc@simpletheme
+  \StocType{chapter}
+  \StocHeading{Overview}
+  \StocEntryWidth{\textwidth}
+  \StocEntrySep{\par\vspace*{3ex}\noindent}
+  \StocDescriptionWidth{\textwidth-2em}
+  \StocDescriptionSep{\par\noindent\hspace*{2em}}
+  \StocNumberFormat{\large\bfseries}
+  \StocNumberSep{\hspace{1em}}
+  \StocTitleFormat{\large\bfseries}
+  \StocTitleWidth{\textwidth}
+  \StocPageSep{\dotfill}
+  \StocPreTable{\vspace*{5ex}}
+  \StocPostTable{\clearpage}
+\fi
+
+\ifstoc@centeredtheme
+  \StocType{chapter}
+  \StocHeading{Overview}
+  \StocEntryWidth{\textwidth}
+  \StocEntrySep{\par\vspace*{5ex}\noindent}
+  \StocDescriptionWidth{\textwidth-0.45\textwidth-2em}
+  \StocDescriptionSep{\hspace*{1em}}
+  \StocNumberFormat{\large}
+  \StocNumberSep{\hspace{1em}}
+  \StocTitleBlockFormat{\flushright}
+  \StocTitleFormat{\scshape\large}
+  \StocTitleWidth{0.45\textwidth}
+  \StocPageLabel{Page}
+  \StocPageSep{\par\noindent}
+  \StocPageFormat{\small}
+  \StocPreTable{\vspace*{10ex}}
+  \StocPostTable{\vspace*{\fill}\clearpage}
+\fi
+%    \end{macrocode}
+% \end{macro}
+%
+%    \begin{macrocode}
+\newwrite\stoc@file
+\newcommand{\stoc@write}[1]{%
+  \@temptokena{#1}
+  \immediate\write\stoc@file{\the\@temptokena}
+}
+\AtEndDocument{
+  \immediate\openout\stoc@file=\jobname.stoc
+}
+%    \end{macrocode}
 %
 % \Finale
