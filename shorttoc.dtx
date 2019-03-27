@@ -22,13 +22,13 @@
 %<package>\NeedsTeXFormat{LaTeX2e}[2003/12/01]
 %<package>\ProvidesPackage{shorttoc}
 %<*package>
-    [2019/03/09 v1.0 Generates a short overview table of contents]
+    [2019/03/27 v1.0 Generates a short overview table of contents]
 %</package>
 %
 %<*driver>
 \documentclass{ltxdoc}
 \usepackage[T1]{fontenc}
-\usepackage[simple]{shorttoc}
+\usepackage{shorttoc}
 \EnableCrossrefs
 \CodelineIndex
 \RecordChanges
@@ -137,42 +137,6 @@
 % This ensures that, if \textsf{Hyperref} \emph{is} included, we will
 % correctly set up hyperlinks; if it is \emph{not} included, then
 % nothing seems out of place.
-%
-% \subsection{Package options}
-% \label{sec:package-options}
-%
-% The \textsf{shorttoc} package has one package option: which of the
-% default layout options to use. The default layout is |simple|, while
-% there is also a fancier |centered| option.
-%
-%    \begin{macrocode}
-\newif\ifstoc@simpletheme\stoc@simplethemefalse
-\newif\ifstoc@centeredtheme\stoc@centeredthemefalse
-
-\DeclareOption{simple}{%
-  \stoc@simplethemetrue%
-  \stoc@centeredthemefalse%
-}
-
-\DeclareOption{centered}{%
-  \stoc@centeredthemetrue%
-  \stoc@simplethemefalse%
-}
-
-\ExecuteOptions{simple}
-
-\ProcessOptions\relax
-
-\ifstoc@simpletheme\ifstoc@centeredtheme
-\PackageError{shorttoc}{More than one layout active}{%
-  More than one layout has been set as active. Either the 'simple'
-  option or 'centered' option for the package should be set, but never
-  both together. If you will be setting styling options yourself, do
-  not pass any options to this package.
-}
-\fi\fi
-%    \end{macrocode}
-%
 %
 % \subsection{Document commands}
 % \label{sec:doc-commands}
@@ -607,57 +571,50 @@
 % \hooklink{\stoc@titlewidth}{\StocTitleWidth}{\marg{length}}
 % \end{macro}
 %
-% \subsection{Built-in themes}
-% \label{sec:built-in-themes}
+% \subsection{Default settings}
+% \label{sec:default-settings}
 %
-% We define two built-in themes for the short table of contents. The
-% |simple| theme is a sensible base to build on top of, should you need
-% any further customisation. The |centered| theme is more complicated,
-% and demonstrates the lengths to which you can go to produce pretty
-% output.
-%
-% \begin{macro}{simple}
-% The |simple| theme defines a chapter page called overview, where
-% every entry is set as a chapter number then name flush left, the
-% page number flush right, and the description set below that slightly
-% indented. All the entries are separated by a small vertical space.
+% The default settings for \textsl{ShortTOC} produce the overview as
+% shown at the beginning of this documentation. The one change we make
+% is to set |\StocType{Section}|.
 %    \begin{macrocode}
-\ifstoc@simpletheme
-  \StocType{chapter}
-  \StocHeading{Overview}
-  \StocEntryWidth{\textwidth}
-  \StocEntrySep{\par\vspace*{3ex}\noindent}
-  \StocDescriptionWidth{\textwidth-2em}
-  \StocDescriptionSep{\par\noindent\hspace*{2em}}
-  \StocNumberFormat{\large\bfseries}
-  \StocNumberSep{\hspace{1em}}
-  \StocTitleFormat{\large\bfseries}
-  \StocTitleWidth{\textwidth}
-  \StocPageSep{\dotfill}
-  \StocPreTable{\vspace*{5ex}}
-  \StocPostTable{\clearpage}
-\fi
-
-\ifstoc@centeredtheme
-  \StocType{chapter}
-  \StocHeading{Overview}
-  \StocEntryWidth{\textwidth}
-  \StocEntrySep{\par\vspace*{5ex}\noindent}
-  \StocDescriptionWidth{\textwidth-0.45\textwidth-2em}
-  \StocDescriptionSep{\hspace*{1em}}
-  \StocNumberFormat{\large}
-  \StocNumberSep{\hspace{1em}}
-  \StocTitleBlockFormat{\flushright}
-  \StocTitleFormat{\scshape\large}
-  \StocTitleWidth{0.45\textwidth}
-  \StocPageLabel{Page}
-  \StocPageSep{\par\noindent}
-  \StocPageFormat{\small}
-  \StocPreTable{\vspace*{10ex}}
-  \StocPostTable{\vspace*{\fill}\clearpage}
-\fi
+\StocType{chapter}
+\StocHeading{Overview}
+\StocEntryWidth{\textwidth}
+\StocEntrySep{\par\vspace*{3ex}\noindent}
+\StocDescriptionWidth{\textwidth-2em}
+\StocDescriptionSep{\par\noindent\hspace*{2em}}
+\StocNumberFormat{\large\bfseries}
+\StocNumberSep{\hspace{1em}}
+\StocTitleFormat{\large\bfseries}
+\StocTitleWidth{\textwidth}
+\StocPageSep{\dotfill}
+\StocPreTable{\vspace*{5ex}}
+\StocPostTable{\clearpage}
 %    \end{macrocode}
-% \end{macro}
+%
+%
+%%%   \StocType{chapter}
+%%%   \StocHeading{Overview}
+%%%   \StocEntryWidth{\textwidth}
+%%%   \StocEntrySep{\par\vspace*{5ex}\noindent}
+%%%   \StocDescriptionWidth{\textwidth-0.45\textwidth-2em}
+%%%   \StocDescriptionSep{\hspace*{1em}}
+%%%   \StocDescriptionFormat{\flushleft}
+%%%   \StocNumberFormat{\large}
+%%%   \StocNumberSep{\hspace{1em}}
+%%%   \StocTitleBlockFormat{\flushright}
+%%%   \StocTitleFormat{\scshape\large}
+%%%   \StocTitleWidth{0.45\textwidth}
+%%%   \StocPageLabel{Page}
+%%%   \StocPageSep{\par\noindent}
+%%%   \StocPageFormat{\small}
+%%%   \StocPreTable{\vspace*{10ex}}
+%%%   \StocPostTable{\vspace*{\fill}\clearpage}
+%
+% \subsection{Writing to the \texttt{.stoc} file}
+% A temporary |.stoc| file is used to keep the short table of contents
+% material available for the next run.
 %
 %    \begin{macrocode}
 \newwrite\stoc@file
