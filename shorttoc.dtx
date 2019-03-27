@@ -334,18 +334,26 @@
 %    \end{macrocode}
 % \end{macro}
 %
-% \begin{macro}{\StocPageLabel}
+% \begin{macro}{\StocPageNumFormat}
 %    \begin{macrocode}
-\newcommand{\StocPageLabel}[1]{
-  \def\stoc@pagelabel{#1}%
+\newcommand{\StocPageNumFormat}[1]{
+  \def\stoc@pagenumformat{#1}%
 }
 %    \end{macrocode}
 % \end{macro}
 %
-% \begin{macro}{\StocPageSep}
+% \begin{macro}{\StocPageNumLabel}
 %    \begin{macrocode}
-\newcommand{\StocPageSep}[1]{
-  \def\stoc@pagesep{#1}%
+\newcommand{\StocPageNumLabel}[1]{
+  \def\stoc@pagenumlabel{#1}%
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \begin{macro}{\StocPageNumSep}
+%    \begin{macrocode}
+\newcommand{\StocPageNumSep}[1]{
+  \def\stoc@pagenumsep{#1}%
 }
 %    \end{macrocode}
 % \end{macro}
@@ -518,12 +526,30 @@
 %
 % \end{macro}
 %
-% \begin{macro}{\stoc@pagelabel}
+% \begin{macro}{\stoc@pagenumformat}
 %    \begin{macrocode}
-\def\stoc@pagelabel{}
+\def\stoc@pagenumformat{}
 %    \end{macrocode}
 %
-% \hooklink{\stoc@pagelabel}{\StocPageLabel}{\marg{label}}
+% \hooklink{\stoc@pagenumformat}{\StocPageNumFormat}{\marg{format}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@pagenumlabel}
+%    \begin{macrocode}
+\def\stoc@pagenumlabel{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@pagenumlabel}{\StocPageNumLabel}{\marg{label}}
+%
+% \end{macro}
+%
+% \begin{macro}{\stoc@pagenumsep}
+%    \begin{macrocode}
+\def\stoc@pagenumsep{}
+%    \end{macrocode}
+%
+% \hooklink{\stoc@pagenumsep}{\StocPageNumSep}{\marg{label}}
 %
 % \end{macro}
 %
@@ -535,8 +561,8 @@
     {\stoc@numberformat \hyperlink{#4}{#1}}%
     \stoc@numbersep%
     {\stoc@titleformat \hyperlink{#4}{#2}}%
-    \stoc@pagesep%
-    {\stoc@pageformat \stoc@pagelabel~#3}%
+    \stoc@pagenumsep%
+    {\stoc@pagenumformat \stoc@pagenumlabel~#3}%
     \\[\fill]%
   \end{minipage}
 }
@@ -588,29 +614,11 @@
 \StocNumberSep{\hspace{1em}}
 \StocTitleFormat{\large\bfseries}
 \StocTitleWidth{\textwidth}
-\StocPageSep{\dotfill}
+\StocPageNumSep{\dotfill}
 \StocPreTable{\vspace*{5ex}}
 \StocPostTable{\clearpage}
 %    \end{macrocode}
 %
-%
-%%%   \StocType{chapter}
-%%%   \StocHeading{Overview}
-%%%   \StocEntryWidth{\textwidth}
-%%%   \StocEntrySep{\par\vspace*{5ex}\noindent}
-%%%   \StocDescriptionWidth{\textwidth-0.45\textwidth-2em}
-%%%   \StocDescriptionSep{\hspace*{1em}}
-%%%   \StocDescriptionFormat{\flushleft}
-%%%   \StocNumberFormat{\large}
-%%%   \StocNumberSep{\hspace{1em}}
-%%%   \StocTitleBlockFormat{\flushright}
-%%%   \StocTitleFormat{\scshape\large}
-%%%   \StocTitleWidth{0.45\textwidth}
-%%%   \StocPageLabel{Page}
-%%%   \StocPageSep{\par\noindent}
-%%%   \StocPageFormat{\small}
-%%%   \StocPreTable{\vspace*{10ex}}
-%%%   \StocPostTable{\vspace*{\fill}\clearpage}
 %
 % \subsection{Writing to the \texttt{.stoc} file}
 % A temporary |.stoc| file is used to keep the short table of contents
